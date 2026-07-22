@@ -14,11 +14,14 @@ async def forward_request(request: Request, target_host: str, path: str) -> Resp
     if request.url.query:
         url += f"?{request.url.query}"
 
-    # Forward all headers except hop-by-hop; strip values (httpx rejects trailing whitespace)
+    # Forward client headers; preserve Host so upstream sets cookies for the public name
     headers = {
         k: v.strip() for k, v in request.headers.items()
         if k.lower() not in ("host", "content-length")
     }
+    client_host = request.headers.get("host")
+    if client_host:
+        headers["Host"] = client_host.strip()
 
     body = await request.body()
 
@@ -36,17 +39,22 @@ async def forward_request(request: Request, target_host: str, path: str) -> Resp
         "upgrade", "proxy-authenticate", "proxy-authorization",
         "te", "trailer",
     }
-    resp_headers = {
-        k: v for k, v in resp.headers.items()
-        if k.lower() not in excluded
-    }
-
-    return Response(
+    # dict headers drop duplicate Set-Cookie; preserve every upstream header
+    response = Response(
         content=resp.content,
         status_code=resp.status_code,
-        headers=resp_headers,
         media_type=resp.headers.get("content-type"),
     )
+    for key, value in resp.headers.multi_items():
+        key_lower = key.lower()
+        if key_lower in excluded or key_lower == "content-type":
+            continue
+        if key_lower == "set-cookie":
+            response.headers.append("set-cookie", value)
+        else:
+            response.headers[key] = value
+
+    return response
 
 
 @app.post("/soap")
