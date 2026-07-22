@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  proxy:
+    build: .
+    ports:
+      - "${PROXY_PORT:-8080}:8080"
+    environment:
+      - PROXY_HOST=0.0.0.0
+      - PROXY_PORT=8080
+      - TARGET_HOST=${TARGET_HOST:-http://backend:9000}
+      - SOAP_TARGET_HOST=${SOAP_TARGET_HOST:-http://soap-backend:9001}
+    restart: unless-stopped
