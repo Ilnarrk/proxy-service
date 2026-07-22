@@ -38,6 +38,8 @@ async def forward_request(request: Request, target_host: str, path: str) -> Resp
         "transfer-encoding", "connection", "keep-alive",
         "upgrade", "proxy-authenticate", "proxy-authorization",
         "te", "trailer",
+        # httpx decodes compressed bodies in resp.content; upstream length/encoding no longer match
+        "content-length", "content-encoding",
     }
     # dict headers drop duplicate Set-Cookie; preserve every upstream header
     response = Response(
